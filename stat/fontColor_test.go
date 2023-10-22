@@ -6,7 +6,7 @@ import (
 )
 
 func TestFontColor(t *testing.T) {
-	escape := "\033[1;30;47m"
+	escape := "\033[42m"
 	reset := "\033[0m" // 用于重置文本样式和颜色
 
 	fmt.Print(escape)

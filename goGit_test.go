@@ -18,7 +18,7 @@ func TestGoGit(t *testing.T) {
 	}
 	cIter, _ := r.Log(&git.LogOptions{From: head.Hash()})
 	err = cIter.ForEach(func(c *object.Commit) error {
-		fmt.Printf("email: %v\n", c.Author.Email)
+		fmt.Printf("TIME: %v\n", c.Author.When)
 		return nil
 	})
 

@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"github.com/go-git/go-git/v5"
 	"github.com/go-git/go-git/v5/plumbing/object"
+	"go_cli/utils"
 	"sort"
 	"time"
 )
@@ -14,13 +15,13 @@ const weeksInLastSixMonths = 26
 
 type column []int
 
-// Stats calculates and prints the stats.
+// Stats 计算并打印统计数据。
 func Stats(email string) {
 	commits := processRepositories(email)
 	printCommitsStats(commits)
 }
 
-// getBeginningOfDay given a time.Time calculates the start time of that day
+// getBeginningOfDay 给定一个`time.Time` 计算当天的开始时间
 func getBeginningOfDay(t time.Time) time.Time {
 	year, month, day := t.Date()
 	startOfDay := time.Date(year, month, day, 0, 0, 0, 0, t.Location())
@@ -60,11 +61,11 @@ func fillCommits(email string, path string, commits *map[int]int) {
 		panic(err)
 	}
 
-	offset := calcOffset()
+	offset := GetOffset()
 	// 遍历提交历史记录
 	err = iterator.ForEach(func(c *object.Commit) error {
 		daysAgo := countDaysSinceDate(c.Author.When) + offset
-
+		println(daysAgo)
 		if c.Author.Email != email {
 			return nil
 		}
@@ -82,17 +83,13 @@ func fillCommits(email string, path string, commits *map[int]int) {
 
 // processRepositories 给定用户电子邮件，返回过去 6 个月内所做的提交
 func processRepositories(email string) map[int]int {
-	// 获取git文件存储路径
-	//filePath := scan.GetDotFilePath()
 
-	// 根据filePath 获取repositories
-	//repos := scan.ParseFileLinesToSlice(filePath)
-	repos := []string{"C:\\Users\\19406\\Desktop\\go\\tta\\cinx"}
-	daysInMap := daysInLastSixMonths
+	// 获取repositories
+	repos := utils.ParseFileToSlice()
 
 	//初始化 在过去 6 个月内每天的contributions
-	commits := make(map[int]int, daysInMap)
-	for i := daysInMap; i > 0; i-- {
+	commits := make(map[int]int, daysInLastSixMonths)
+	for i := daysInLastSixMonths; i > 0; i-- {
 		commits[i] = 0
 	}
 	//统计每个repository的contributions
@@ -103,12 +100,9 @@ func processRepositories(email string) map[int]int {
 	return commits
 }
 
-// calcOffset 确定并返回填充统计图最后一行所缺少的天数
-func calcOffset() int {
-	var offset int
-	weekday := time.Now().Weekday()
-
-	switch weekday {
+// GetOffset 确定并返回填充统计图最后一行所缺少的天数
+func GetOffset() (offset int) {
+	switch time.Now().Weekday() {
 	case time.Sunday:
 		offset = 7
 	case time.Monday:
@@ -124,41 +118,40 @@ func calcOffset() int {
 	case time.Saturday:
 		offset = 1
 	}
-
-	return offset
+	return
 }
 
-// printCell given a cell value prints it with a different format
-// based on the value amount, and on the `today` flag.
-func printCell(val int, today bool) {
+// printCell 打印一个单元格值，根据值contributions和`today`标志以不同的格式打印它。
+func printCell(contributions int, today bool) {
 	escape := "\033[0;37;30m"
 	switch {
-	case val > 0 && val < 5:
-		escape = "\033[1;30;47m"
-	case val >= 5 && val < 10:
-		escape = "\033[1;30;43m"
-	case val >= 10:
+	case contributions > 0 && contributions < 5:
+		escape = "\033[1;42m"
+	case contributions >= 5 && contributions < 10:
 		escape = "\033[1;30;42m"
+	case contributions >= 10:
+		escape = "\033[100m"
 	}
 
 	if today {
 		escape = "\033[1;37;45m"
 	}
-
-	if val == 0 {
+	// 当天无contribution
+	if contributions == 0 {
 		fmt.Printf(escape + "  - " + "\033[0m")
 		return
 	}
 
+	//控制对齐
 	str := "  %d "
 	switch {
-	case val >= 10:
+	case contributions >= 10:
 		str = " %d "
-	case val >= 100:
+	case contributions >= 100:
 		str = "%d "
 	}
 
-	fmt.Printf(escape+str+"\033[0m", val)
+	fmt.Printf(escape+str+"\033[0m", contributions)
 }
 
 // printCommitsStats prints the commits stats
@@ -169,10 +162,9 @@ func printCommitsStats(commits map[int]int) {
 }
 
 // sortMapIntoSlice 返回已排序map的key的切片
-func sortMapIntoSlice(m map[int]int) []int {
-	// To store the keys in slice in sorted order
+func sortMapIntoSlice(commits map[int]int) []int {
 	var keys []int
-	for k := range m {
+	for k := range commits {
 		keys = append(keys, k)
 	}
 	sort.Ints(keys)
@@ -215,7 +207,7 @@ func printCells(columns map[int]column) {
 			if col, ok := columns[i]; ok {
 				if len(col) > j {
 					//special case today
-					if i == weeksInLastSixMonths && j == calcOffset()-1 {
+					if i == weeksInLastSixMonths && j == GetOffset()-1 {
 						printCell(col[j], false)
 
 					} else {
@@ -231,8 +223,7 @@ func printCells(columns map[int]column) {
 	}
 }
 
-// printMonths prints the month names in the first line, determining when the month
-// changed between switching weeks
+// printMonths 在第一行打印月份名称，确定月份在切换周之间发生变化的时间
 func printMonths() {
 	week := getBeginningOfDay(time.Now()).Add(-(daysInLastSixMonths * time.Hour * 24))
 	month := week.Month()
@@ -253,11 +244,10 @@ func printMonths() {
 	fmt.Printf("\n")
 }
 
-// printDayCol given the day number (0 is Sunday) prints the day name,
-// alternating the rows (prints just 2,4,6)
-func printDayCol(day int) {
+// printDayCol 给定行号(0为周日）打印日期名称，交替行（仅打印 2,4,6）
+func printDayCol(row int) {
 	out := "     "
-	switch day {
+	switch row {
 	case 1:
 		out = " Mon "
 	case 3:
@@ -265,6 +255,5 @@ func printDayCol(day int) {
 	case 5:
 		out = " Fri "
 	}
-
 	fmt.Print(out)
 }

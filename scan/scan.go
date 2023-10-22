@@ -1,10 +1,7 @@
 package scan
 
 import (
-	"bufio"
-	"fmt"
-	"io"
-	"log"
+	"go_cli/utils"
 	"log/slog"
 	"os"
 	"strings"
@@ -12,144 +9,63 @@ import (
 
 /*
 Scan
-扫描给定路径，抓取该路径及其子文件夹,搜索 Git 存储库
+扫描给定路径，抓取该路径及其子文件夹,搜索 Git 仓库
 */
 func Scan(path string) {
-	fmt.Printf("Found folders:\n\n")
+	slog.Info("[Start matching .git files]")
+
 	repositories := recursiveScanFolder(path)
-	filePath := GetDotFilePath()
-	addNewSliceElementsToFile(filePath, repositories)
-	fmt.Printf("\n\nSuccessfully added\n\n")
+
+	utils.AddNewPaths(repositories)
+
+	slog.Info("[.git files have added successfully]")
 }
 
-// recursiveScanFolder starts the recursive search of git repositories
-// living in the `folder` subtree
+// recursiveScanFolder 开始递归搜索位于“folder”子树中的 git 存储库
 func recursiveScanFolder(folder string) []string {
 	return scanGitFolders(make([]string, 0), folder)
 }
 
-// scanGitFolders 返回以“.git”结尾的“folder”子文件夹列表.
-// Returns the base folder of the repo, the .git folder parent.
-// Recursively searches in the subfolders by passing an existing `folders` slice.
+// scanGitFolders 返回git库的基本文件夹，即 .git 文件隶属的文件夹目录
 func scanGitFolders(folders []string, folder string) []string {
-	// trim the last `/`
 	folder = strings.TrimSuffix(folder, "/")
-
 	f, err := os.Open(folder)
 	if err != nil {
-		log.Fatal(err)
+		slog.Error("[os.Open() ERROR] ", err)
+		return nil
 	}
+	// Readdir 函数通常用于从一个目录中读取其内容，并返回一个目录项（文件和子目录）的切片。
 	files, err := f.Readdir(-1)
-	f.Close()
+	defer f.Close()
 	if err != nil {
-		log.Fatal(err)
+		slog.Error("[f.Readdir() ERROR] ", err)
+		return nil
 	}
-
-	var path string
 
 	for _, file := range files {
+		/*
+			if 文件夹
+				then
+			    if .git文件，
+					then 将.git文件的父级目录存入folders
+					continue
+				继续递归
+			endif
+		*/
 		if file.IsDir() {
-			path = folder + "\\" + file.Name()
+			path := folder + "\\" + file.Name()
 			if file.Name() == ".git" {
 				path = strings.TrimSuffix(path, "\\.git")
-				fmt.Println(path)
+				slog.Info("[.git file] ", "path", path)
 				folders = append(folders, path)
 				continue
 			}
+			// `vendor`文件夹和·node_modules`文件夹不扫描
 			if file.Name() == "vendor" || file.Name() == "node_modules" {
 				continue
 			}
 			folders = scanGitFolders(folders, path)
-
 		}
 	}
 	return folders
-}
-
-// GetDotFilePath returns the dot file for the repos list.
-// Crt and the enclosing folder if it does nt exist.
-func GetDotFilePath() string {
-	//usr, err := user.Current()
-	//if err != nil {
-	//	log.Fatal(err)
-	//}
-
-	dotFile := "C:\\Users\\19406\\Desktop\\go\\store.txt"
-
-	return dotFile
-}
-
-// addNewSliceElementsToFile given a slice of strings representing paths, stores them
-// to the filesystem
-func addNewSliceElementsToFile(filePath string, newRepos []string) {
-	existingRepos := ParseFileLinesToSlice(filePath)
-	repos := joinSlices(newRepos, existingRepos)
-	dumpStringsSliceToFile(repos, filePath)
-}
-
-// ParseFileLinesToSlice given a file path string, gets the content
-// of each line and parses it to a slice of strings.
-func ParseFileLinesToSlice(filePath string) []string {
-	f := openFile(filePath)
-	defer f.Close()
-
-	var lines []string
-	scanner := bufio.NewScanner(f)
-	for scanner.Scan() {
-		lines = append(lines, scanner.Text())
-	}
-	if err := scanner.Err(); err != nil {
-		if err != io.EOF {
-			slog.Info("", err)
-			panic(err)
-		}
-	}
-
-	return lines
-}
-
-// openFile opens the file located at `filePath`. Creates it if not existing.
-func openFile(filePath string) *os.File {
-	f, err := os.Open(filePath)
-	if err != nil {
-		if os.IsNotExist(err) {
-			// file does not exist
-			_, err = os.Create(filePath)
-			if err != nil {
-				panic(err)
-			}
-		} else {
-			// other error
-			panic(err)
-		}
-	}
-
-	return f
-}
-
-// joinSlices adds the element of the `new` slice
-// into the `existing` slice, only if not already there
-func joinSlices(new []string, existing []string) []string {
-	for _, i := range new {
-		if !sliceContains(existing, i) {
-			existing = append(existing, i)
-		}
-	}
-	return existing
-}
-
-// sliceContains returns true if `slice` contains `value`
-func sliceContains(slice []string, value string) bool {
-	for _, v := range slice {
-		if v == value {
-			return true
-		}
-	}
-	return false
-}
-
-// dumpStringsSliceToFile writes content to the file in path `filePath` (overwriting existing content)
-func dumpStringsSliceToFile(repos []string, filePath string) {
-	content := strings.Join(repos, "\n")
-	os.WriteFile(filePath, []byte(content), 0755)
 }
