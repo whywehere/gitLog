@@ -5,5 +5,4 @@
 `https://flaviocopes.com/go-git-contributions/`
 
 ## 运行效果
-![img.png](img.png)
-
+![img.png](image%2Fimg.png)
